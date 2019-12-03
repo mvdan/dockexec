@@ -1,8 +1,6 @@
 // Copyright (c) 2019, Daniel Martí <mvdan@mvdan.cc>
 // See LICENSE for licensing information
 
-// go test -exec='dockexec image:tag' [test flags]
-
 package main
 
 import (
@@ -12,21 +10,43 @@ import (
 	"os/exec"
 )
 
-func main() {
-	flag.Parse()
-	args := flag.Args()
+var flagSet = flag.NewFlagSet("dockexec", flag.ContinueOnError)
+
+func init() { flagSet.Usage = usage }
+
+func usage() {
+	fmt.Fprintf(os.Stderr, `
+Usage of dockexec:
+
+	go test -exec='dockexec image:tag [args]'
+
+Or, executing it directly:
+
+	dockexec image:tag pkg.test [args]
+`[1:])
+	flagSet.PrintDefaults()
+}
+
+func main() { os.Exit(main1()) }
+
+func main1() int {
+	if err := flagSet.Parse(os.Args[1:]); err != nil {
+		return 2
+	}
+	args := flagSet.Args()
+
+	if len(args) < 2 {
+		flagSet.Usage()
+		return 2
+	}
 
 	image := args[0]
 	binary := args[1]
 
-	if len(args) < 2 {
-		flag.Usage()
-	}
-
 	wd, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return 1
 	}
 
 	dockerArgs := []string{
@@ -56,6 +76,7 @@ func main() {
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
