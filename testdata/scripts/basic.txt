@@ -11,21 +11,26 @@ symlink .bin/dockexec -> $TESTBIN
 env PATH=.bin:$PATH
 env TESTSCRIPT_COMMAND=dockexec
 
-# First, check that we succeed without -exec.
+# Check that we succeed without -exec.
 exec go test
 ! stdout 'TestWithBusybox'
 stdout 'PASS'
 
-# Then, check that we fail with an invalid image.
+# Check that we fail with an invalid image.
 ! exec go test -exec='dockexec :bad:syntax:'
 stdout 'docker:'
 
-# Then, check that we succeed with just a simple image, and that the test
-# requiring busybox isn't skipped. This also ensures that test flags are passed
-# along.
+# Check that we succeed with just a simple image, and that the test requiring
+# busybox isn't skipped.
 exec go test -exec='dockexec busybox:1.31.1-musl' -v
-! stdout 'SKIP'
-stdout 'TestWithBusybox'
+! stdout 'SKIP.*TestWithBusybox'
+stdout 'PASS.*TestWithBusybox'
+stdout 'PASS'
+
+# Check that test flags, even custom ones, work.
+exec go test -exec='dockexec busybox:1.31.1-musl' -v -myflag
+! stdout 'SKIP.*TestWithMyFlag'
+stdout 'PASS.*TestWithMyFlag'
 stdout 'PASS'
 
 -- go.mod --
@@ -40,9 +45,12 @@ func True() bool { return true }
 package bar
 
 import (
+	"flag"
 	"os/exec"
 	"testing"
 )
+
+var myflag = flag.Bool("myflag", false, "")
 
 func TestTrue(t *testing.T) {
 	if True() != true {
@@ -53,5 +61,11 @@ func TestTrue(t *testing.T) {
 func TestWithBusybox(t *testing.T) {
 	if _, err := exec.LookPath("busybox"); err != nil {
 		t.Skip("busybox not installed")
+	}
+}
+
+func TestWithMyFlag(t *testing.T) {
+	if !*myflag {
+		t.Skip("-myflag not specified")
 	}
 }
