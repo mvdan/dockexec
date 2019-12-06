@@ -24,6 +24,7 @@ Usage of dockexec:
 For example:
 
 	go test -exec='dockexec postgres:12.1'
+	go test -exec='dockexec postgres:12.1 -m 512m' -v -race
 
 You can also run it directly, if you must:
 
