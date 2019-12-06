@@ -26,6 +26,7 @@ func TestScripts(t *testing.T) {
 	testscript.Run(t, testscript.Params{
 		Dir: filepath.Join("testdata", "scripts"),
 		Setup: func(env *testscript.Env) error {
+			env.Vars = append(env.Vars, "TESTBIN="+os.Args[0])
 			return nil
 		},
 		UpdateScripts: *update,
