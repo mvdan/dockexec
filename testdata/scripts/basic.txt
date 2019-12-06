@@ -3,10 +3,6 @@
 [!exec:docker] skip
 [!symlink] skip
 
-# TODO: do we get a speed-up if we reuse the host's $HOME, e.g. for Go's or
-# Docker's caches?
-env HOME=$WORK/home
-
 # We want to use the current dockexec, not whichever happens to be globally
 # installed. Use the test binary with TESTSCRIPT_COMMAND, which we know will
 # correctly run dockexec thanks to go-internal/testscript.

@@ -27,6 +27,14 @@ func TestScripts(t *testing.T) {
 		Dir: filepath.Join("testdata", "scripts"),
 		Setup: func(env *testscript.Env) error {
 			env.Vars = append(env.Vars, "TESTBIN="+os.Args[0])
+			for _, name := range [...]string{
+				"HOME",
+				"GOCACHE",
+			} {
+				if value := os.Getenv(name); value != "" {
+					env.Vars = append(env.Vars, name+"="+value)
+				}
+			}
 			return nil
 		},
 		UpdateScripts: *update,
