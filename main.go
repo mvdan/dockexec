@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 var flagSet = flag.NewFlagSet("dockexec", flag.ContinueOnError)
@@ -18,13 +19,18 @@ func usage() {
 	fmt.Fprintf(os.Stderr, `
 Usage of dockexec:
 
-	go test -exec='dockexec image:tag [args]'
+	go test -exec='dockexec [docker flags] image:tag' [test flags]
 
-Or, executing it directly:
+For example:
 
-	dockexec image:tag pkg.test [args]
+	go test -exec='dockexec postgres:12.1'
+
+You can also run it directly, if you must:
+
+	dockexec image:tag [docker flags] pkg.test [test flags]
 `[1:])
 	flagSet.PrintDefaults()
+	os.Exit(2)
 }
 
 func main() { os.Exit(main1()) }
@@ -37,11 +43,32 @@ func main1() int {
 
 	if len(args) < 2 {
 		flagSet.Usage()
-		return 2
 	}
-
 	image := args[0]
-	binary := args[1]
+	args = args[1:]
+
+	// The rest of the arguments are in the form of:
+	//
+	//   [docker flags] pkg.test [test flags]
+	//
+	// For now, parse this by looking for the first argument that doesn't
+	// start with "-", and which contains ".test".If this isn't enough in
+	// the long run, we can start parsing docker flags instead.
+	var dockerFlags []string
+	var binary string
+	var testFlags []string
+	for i, arg := range args {
+		if !strings.HasPrefix(arg, "-") && strings.Contains(arg, ".test") {
+			dockerFlags = args[:i]
+			binary = arg
+			testFlags = args[i+1:]
+			break
+		}
+	}
+	if binary == "" {
+		fmt.Fprintln(os.Stderr, "could not find the test binary argument")
+		flagSet.Usage()
+	}
 
 	wd, err := os.Getwd()
 	if err != nil {
@@ -49,7 +76,8 @@ func main1() int {
 		return 1
 	}
 
-	dockerArgs := []string{
+	// First, start with our docker flags.
+	allDockerArgs := []string{
 		"run",
 
 		// Delete the container when we're done.
@@ -62,15 +90,19 @@ func main1() int {
 		// Set up the package directory as the workdir.
 		fmt.Sprintf("--volume=%s:/pwd", wd),
 		"--workdir=/pwd",
-
-		// Use the specified image.
-		image,
 	}
-	// Finally, pass the rest of the arguments to the test binary, such as
-	// -test.timeout or -test.v flags.
-	dockerArgs = append(dockerArgs, args[2:]...)
 
-	cmd := exec.Command("docker", dockerArgs...)
+	// Then, add the user's docker flags.
+	allDockerArgs = append(allDockerArgs, dockerFlags...)
+
+	// Add "--" to stop all docker flags, plus the specified image.
+	allDockerArgs = append(allDockerArgs, "--", image)
+
+	// Finally, pass all the test arguments to the test binary, such as
+	// -test.timeout or -test.v flags.
+	allDockerArgs = append(allDockerArgs, testFlags...)
+
+	cmd := exec.Command("docker", allDockerArgs...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

@@ -33,6 +33,17 @@ exec go test -exec='dockexec busybox:1.31.1-musl' -v -myflag
 stdout 'PASS.*TestWithMyFlag'
 stdout 'PASS'
 
+# Check that 'docker run' flags work.
+exec go test -exec='dockexec busybox:1.31.1-musl -e MYVAR=foo' -v
+! stdout 'SKIP.*TestWithMyVar'
+stdout 'PASS.*TestWithMyVar'
+stdout 'PASS'
+
+# Check that a bad 'docker run' flag breaks.
+! exec go test -exec='dockexec busybox:1.31.1-musl --invalidflag' -v
+stdout 'unknown flag'
+stdout 'docker run --help'
+
 -- go.mod --
 module foo.com/bar
 
@@ -46,6 +57,7 @@ package bar
 
 import (
 	"flag"
+	"os"
 	"os/exec"
 	"testing"
 )
@@ -67,5 +79,11 @@ func TestWithBusybox(t *testing.T) {
 func TestWithMyFlag(t *testing.T) {
 	if !*myflag {
 		t.Skip("-myflag not specified")
+	}
+}
+
+func TestWithMyVar(t *testing.T) {
+	if os.Getenv("MYVAR") != "foo" {
+		t.Skip("MYVAR=foo not specified")
 	}
 }
