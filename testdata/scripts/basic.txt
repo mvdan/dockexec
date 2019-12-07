@@ -1,4 +1,3 @@
-# This test probably only works on Unix-y systems. That's fine for now.
 [!exec:go] skip
 [!exec:docker] skip
 [!symlink] skip
@@ -7,42 +6,51 @@
 # installed. Use the test binary with TESTSCRIPT_COMMAND, which we know will
 # correctly run dockexec thanks to go-internal/testscript.
 mkdir .bin
-symlink .bin/dockexec -> $TESTBIN
-env PATH=.bin:$PATH
+symlink .bin/dockexec$exe -> $TESTBIN
+env PATH=.bin${:}$PATH
 env TESTSCRIPT_COMMAND=dockexec
+
+# GitHub Actions doesn't export %LocalAppData% yet, so do it here to ensure the
+# test passes.
+[windows] env LOCALAPPDATA=$WORK\appdata
 
 # Check that we succeed without -exec.
 exec go test
-! stdout 'TestWithBusybox'
 stdout 'PASS'
 
 # Check that we fail with an invalid image.
 ! exec go test -exec='dockexec :bad:syntax:'
-stdout 'docker:'
+stdout 'docker:.*invalid'
+
+# Check that a bad 'docker run' flag breaks.
+! exec go test -exec='dockexec irrelevant-image --invalidflag' -v
+stdout 'unknown flag'
+stdout 'docker run --help'
+
+[!windows] env IMAGE=busybox:1.31.1-musl
+[windows] skip 'TODO: support windows-native images in --volume flags'
+[windows] env IMAGE=mcr.microsoft.com/windows/nanoserver:1809
 
 # Check that we succeed with just a simple image, and that the test requiring
 # busybox isn't skipped.
-exec go test -exec='dockexec busybox:1.31.1-musl' -v
-! stdout 'SKIP.*TestWithBusybox'
-stdout 'PASS.*TestWithBusybox'
+exec go test -exec='dockexec '$IMAGE -v
+[!windows] stdout 'PASS.*TestWithBusybox'
+[!windows] stdout 'SKIP.*TestWithWindows'
+[windows] stdout 'SKIP.*TestWithBusybox'
+[windows] stdout 'PASS.*TestWithWindows'
 stdout 'PASS'
 
 # Check that test flags, even custom ones, work.
-exec go test -exec='dockexec busybox:1.31.1-musl' -v -myflag
+exec go test -exec='dockexec '$IMAGE -v -myflag
 ! stdout 'SKIP.*TestWithMyFlag'
 stdout 'PASS.*TestWithMyFlag'
 stdout 'PASS'
 
 # Check that 'docker run' flags work.
-exec go test -exec='dockexec busybox:1.31.1-musl -e MYVAR=foo' -v
+exec go test -exec='dockexec '$IMAGE' -e MYVAR=foo' -v
 ! stdout 'SKIP.*TestWithMyVar'
 stdout 'PASS.*TestWithMyVar'
 stdout 'PASS'
-
-# Check that a bad 'docker run' flag breaks.
-! exec go test -exec='dockexec busybox:1.31.1-musl --invalidflag' -v
-stdout 'unknown flag'
-stdout 'docker run --help'
 
 -- go.mod --
 module foo.com/bar
@@ -59,6 +67,7 @@ import (
 	"flag"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 )
 
@@ -73,6 +82,12 @@ func TestTrue(t *testing.T) {
 func TestWithBusybox(t *testing.T) {
 	if _, err := exec.LookPath("busybox"); err != nil {
 		t.Skip("busybox not installed")
+	}
+}
+
+func TestWithWindows(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("not on windows")
 	}
 }
 
