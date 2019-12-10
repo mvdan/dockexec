@@ -1,18 +1,4 @@
-[!exec:go] skip
-[!exec:docker] skip
-[!symlink] skip
-
-# We want to use the current dockexec, not whichever happens to be globally
-# installed. Use the test binary with TESTSCRIPT_COMMAND, which we know will
-# correctly run dockexec thanks to go-internal/testscript.
-mkdir .bin
-symlink .bin/dockexec$exe -> $TESTBIN
-env PATH=.bin${:}$PATH
-env TESTSCRIPT_COMMAND=dockexec
-
-# GitHub Actions doesn't export %LocalAppData% yet, so do it here to ensure the
-# test passes.
-[windows] env LOCALAPPDATA=$WORK\appdata
+# Basic test cases for dockexec
 
 # Check that we succeed without -exec.
 exec go test
