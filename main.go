@@ -4,11 +4,15 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 var flagSet = flag.NewFlagSet("dockexec", flag.ContinueOnError)
@@ -94,11 +98,6 @@ func mainerr() error {
 		return usageErr("could not find the test binary argument")
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
 	// First, start with our docker flags.
 	allDockerArgs := []string{
 		"run",
@@ -110,10 +109,16 @@ func mainerr() error {
 		fmt.Sprintf("--volume=%s:/init", binary),
 		"--entrypoint=/init",
 
-		// Set up the package directory as the workdir.
-		fmt.Sprintf("--volume=%s:/pwd", wd),
-		"--workdir=/pwd",
+		// User uid and git for GOPATH and GOCACHE volume mappings
+		fmt.Sprintf("--user=%v:%v", syscall.Getuid(), syscall.Getgid()),
 	}
+
+	// Add docker flags based on our context (module-aware, GOPATH or ad hoc mode)
+	contextDockerFlags, err := buildDockerFlags()
+	if err != nil {
+		return err
+	}
+	allDockerArgs = append(allDockerArgs, contextDockerFlags...)
 
 	// Then, add the user's docker flags.
 	allDockerArgs = append(allDockerArgs, dockerFlags...)
@@ -133,4 +138,127 @@ func mainerr() error {
 		return err
 	}
 	return nil
+}
+
+// buildDockerFlags returns a slice of docker flags based on the current
+// context. We apply different logic based on whether we are in:
+//
+// * module-aware mode
+// * GOPATH mode
+// * ad hoc mode
+//
+// For all the scenarios below the test binary will be mounted as /init; GOPATH
+// and GOCACHE are made available at canonical locations. The GOPATH mode
+// description below describes how and where GOPATH is made available.
+//
+// Module-aware mode
+// -----------------
+// Assuming:
+//
+// * a module $m is rooted at $moddir
+// * that the package $m/cmd/blah/ exists
+// * a working directory of $moddir
+// * that we run go test -exec='...' ./cmd/blah
+//
+// Then $moddir will be mounted as /start and the working directory will be
+// /start/cmd/blah.
+//
+// GOPATH mode (to be implemented)
+// -------------------------------
+// Assuming:
+//
+// * GOPATH=/gp1:/gp2
+// * that the package github.com/a/b/cmd/blah exists within /gp1/src
+// * a working directory of /gp1/src/github.com/a/b
+// * that we run go test -exec='...' ./cmd/blah
+//
+// Then /gp2 will be mounted as /gopath2, /gp1 will be mounted as /gopath1,
+// GOPATH=/gopath1:/gopath2 will be set, and the working directory will be
+// /gopath2/src/github.com/a/b
+//
+// TODO: implement GOPATH logic; for now we assume ad hoc mode logic.
+//
+// Ad hoc mode
+// -----------
+// Assuming:
+//
+// * a working directory of $dir
+//
+// Then $dir will be mounted as /start and the working directory will be
+// /start
+func buildDockerFlags() ([]string, error) {
+	var res []string
+
+	var env struct {
+		GOCACHE string
+		GOPATH  string
+		GOMOD   string
+	}
+	envCmd := exec.Command("go", "env", "-json")
+	out, err := envCmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run %v: %v\n%s", strings.Join(envCmd.Args, " "), err, out)
+	}
+	if err := json.Unmarshal(out, &env); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal %v output: %v", strings.Join(envCmd.Args, " "), err)
+	}
+
+	// Normalise GOPATH elements for symlinks for the purposes of
+	// GOPATH mode below
+	var gp []string
+	var dockerGp []string // the gopath elements for the container
+	for i, v := range strings.Split(env.GOPATH, string(os.PathListSeparator)) {
+		ev, err := filepath.EvalSymlinks(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to filepath.EvalSymlinks(%q)", v)
+		}
+		gp = append(gp, ev)
+		dv := fmt.Sprintf("/gopath%v", i+1)
+		res = append(res, fmt.Sprintf("--volume=%v:%v", ev, dv))
+		dockerGp = append(dockerGp, dv)
+	}
+	res = append(res,
+		"--env=GOPATH="+strings.Join(dockerGp, string(os.PathListSeparator)),
+		fmt.Sprintf("--volume=%v:/gocache", env.GOCACHE),
+		"--env=GOCACHE=/gocache",
+	)
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %v", err)
+	}
+
+	if env.GOMOD != "" && env.GOMOD != os.DevNull {
+		// we are in module-aware mode and have a main module
+		var mod struct {
+			Path string
+			Dir  string
+		}
+		modCmd := exec.Command("go", "list", "-m", "-json")
+		out, err := modCmd.CombinedOutput()
+		if err != nil {
+			return nil, fmt.Errorf("failed to run %v: %v\n%s", strings.Join(modCmd.Args, " "), err, out)
+		}
+		if err := json.Unmarshal(out, &mod); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal %v output: %v", strings.Join(modCmd.Args, " "), err)
+		}
+		rel, err := filepath.Rel(mod.Dir, wd)
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine %v relative to %v: %v", wd, mod.Dir, err)
+		}
+		res = append(res,
+			fmt.Sprintf("--volume=%v:/start", mod.Dir),
+			fmt.Sprintf("--workdir=%v", path.Join("/start", rel)), // TODO fix up when we properly support windows
+		)
+		return res, nil
+	}
+
+	// TODO: implement GOPATH logic; for now we assume ad hoc mode logic.
+
+	res = append(res,
+		fmt.Sprintf("--volume=%v:/start", wd),
+		"--workdir=/start",
+	)
+
+	return res, nil
 }
