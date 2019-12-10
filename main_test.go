@@ -53,6 +53,10 @@ func TestScripts(t *testing.T) {
 				env.Vars = append(env.Vars, fmt.Sprintf(`LOCALAPPDATA=%s\appdata`, env.WorkDir))
 			}
 
+			// In order to make go available inside containers where the guest
+			// and host OS and arch match, we define HOST_GOROOT
+			env.Vars = append(env.Vars, "HOST_GOROOT="+runtime.GOROOT())
+
 			for _, name := range [...]string{
 				"HOME",
 				"USERPROFILE", // $HOME for windows
