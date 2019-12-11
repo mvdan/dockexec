@@ -176,8 +176,6 @@ func mainerr() error {
 // GOPATH=/gopath1:/gopath2 will be set, and the working directory will be
 // /gopath2/src/github.com/a/b
 //
-// TODO: implement GOPATH logic; for now we assume ad hoc mode logic.
-//
 // Ad hoc mode
 // -----------
 // Assuming:
@@ -253,7 +251,25 @@ func buildDockerFlags() ([]string, error) {
 		return res, nil
 	}
 
-	// TODO: implement GOPATH logic; for now we assume ad hoc mode logic.
+	// At this point we know we are not in module-aware module/main module.
+	// Check whether our working directory is a subdirectory of a GOPATH
+	// element, in which case we are in GOPATH mode.
+	found := -1
+	var rel string
+	for i, p := range gp {
+		if strings.HasPrefix(wd, p+string(os.PathSeparator)) { // TODO fix up when we properly support windows
+			found = i
+			rel = strings.TrimPrefix(wd, p+string(os.PathSeparator))
+			break
+		}
+	}
+	if found > -1 {
+		// we are in GOPATH mode
+		res = append(res,
+			fmt.Sprintf("--workdir=%v", path.Join(dockerGp[found], rel)), // TODO fix up when we properly support windows
+		)
+		return res, nil
+	}
 
 	res = append(res,
 		fmt.Sprintf("--volume=%v:/start", wd),
