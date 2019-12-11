@@ -31,19 +31,43 @@ You can also run it directly, if you must:
 	dockexec image:tag [docker flags] pkg.test [test flags]
 `[1:])
 	flagSet.PrintDefaults()
-	os.Exit(2)
 }
+
+type usageErr string
+
+func (u usageErr) Error() string { return string(u) }
+
+type flagErr string
+
+func (f flagErr) Error() string { return string(f) }
 
 func main() { os.Exit(main1()) }
 
 func main1() int {
-	if err := flagSet.Parse(os.Args[1:]); err != nil {
+	err := mainerr()
+	if err == nil {
+		return 0
+	}
+	switch err.(type) {
+	case usageErr:
+		fmt.Fprintln(os.Stderr, err)
+		flagSet.Usage()
 		return 2
+	case flagErr:
+		return 2
+	}
+	fmt.Fprintln(os.Stderr, err)
+	return 1
+}
+
+func mainerr() error {
+	if err := flagSet.Parse(os.Args[1:]); err != nil {
+		return flagErr(err.Error())
 	}
 	args := flagSet.Args()
 
 	if len(args) < 2 {
-		flagSet.Usage()
+		return usageErr("incorrect number of arguments")
 	}
 	image := args[0]
 	args = args[1:]
@@ -67,14 +91,12 @@ func main1() int {
 		}
 	}
 	if binary == "" {
-		fmt.Fprintln(os.Stderr, "could not find the test binary argument")
-		flagSet.Usage()
+		return usageErr("could not find the test binary argument")
 	}
 
 	wd, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+		return err
 	}
 
 	// First, start with our docker flags.
@@ -108,8 +130,7 @@ func main1() int {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+		return err
 	}
-	return 0
+	return nil
 }
