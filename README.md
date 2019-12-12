@@ -17,3 +17,14 @@ any good:
   in the image.
 * Running `go test -c` and running the test binary under `docker run` is
   tedious, error-prone, and doesn't scale to many packages.
+
+### Caveats
+
+* `go test` without package arguments runs tests with access to the current
+  terminal. However, `go test -exec="dockexec $image"` will not, as `dockexec`
+  cannot distinguish this mode from others like `go test -exec="dockexec $image"
+  ./...`. If you want access to the terminal, supply the `-t` docker flag.
+
+* Docker images are assumed to be unix-like at the moment, and only Linux images
+  are tested. Other platforms like Windows-native images may be supported in the
+  future.
