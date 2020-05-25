@@ -9,6 +9,10 @@ You can also use custom flags for `docker run`, as well as any test flags:
 
 	go test -exec='dockexec [docker flags] image:tag' [test flags]
 
+`go run` is also supported:
+
+	go run -exec='dockexec postgres:12.1' .
+
 The goal is to easily test many packages with specific Docker images, without
 having to write the boilerplate code yourself. All previous alternatives weren't
 any good:

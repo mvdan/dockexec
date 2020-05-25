@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 )
@@ -81,13 +82,19 @@ func mainerr() error {
 	//   [docker flags] pkg.test [test flags]
 	//
 	// For now, parse this by looking for the first argument that doesn't
-	// start with "-", and which contains ".test".If this isn't enough in
-	// the long run, we can start parsing docker flags instead.
+	// start with "-", and which looks like a Go binary. If this isn't
+	// enough in the long run, we can start parsing docker flags instead.
+	//
+	// As of today, the binary can look like:
+	//
+	//     go test: [...]/go-build[...]/b[...]/${pkg}.test
+	//     go run:  [...]/go-build[...]/b[...]/exe/bar
 	var dockerFlags []string
 	var binary string
 	var testFlags []string
+	rxBinary := regexp.MustCompile(`\.test$|/exe/[a-zA-Z0-9_]+$`)
 	for i, arg := range args {
-		if !strings.HasPrefix(arg, "-") && strings.Contains(arg, ".test") {
+		if !strings.HasPrefix(arg, "-") && rxBinary.MatchString(arg) {
 			dockerFlags = args[:i]
 			binary = arg
 			testFlags = args[i+1:]

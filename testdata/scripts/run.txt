@@ -1,0 +1,49 @@
+# Test cases involving 'go run' instead of 'go test'.
+
+[!windows] env IMAGE=busybox:1.31.1-musl
+[windows] skip 'TODO: support windows-native images in --volume flags'
+[windows] env IMAGE=mcr.microsoft.com/windows/nanoserver:1809
+
+exec go run -exec='dockexec '$IMAGE .
+[!windows] stdout 'busybox installed'
+[!windows] ! stdout 'on windows'
+[windows] ! stdout 'busybox installed'
+[windows] stdout 'on windows'
+
+exec go run -exec='dockexec '$IMAGE . -myflag
+stdout '-myflag specified'
+
+exec go run -exec='dockexec '$IMAGE' -e MYVAR=foo' .
+stdout 'MYVAR=foo specified'
+
+-- go.mod --
+module foo.com/bar
+
+-- main.go --
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+	"os/exec"
+	"runtime"
+)
+
+var myflag = flag.Bool("myflag", false, "")
+
+func main() {
+	flag.Parse()
+	if _, err := exec.LookPath("busybox"); err == nil {
+		fmt.Println("busybox installed")
+	}
+	if runtime.GOOS == "windows" {
+		fmt.Println("on windows")
+	}
+	if *myflag {
+		fmt.Println("-myflag specified")
+	}
+	if os.Getenv("MYVAR") == "foo" {
+		fmt.Println("MYVAR=foo specified")
+	}
+}
