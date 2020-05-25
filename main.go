@@ -85,14 +85,14 @@ func mainerr() error {
 	// start with "-", and which looks like a Go binary. If this isn't
 	// enough in the long run, we can start parsing docker flags instead.
 	//
-	// As of today, the binary can look like:
+	// As of today, the binary can look like (possibly with an ".exe" suffix):
 	//
 	//     go test: [...]/go-build[...]/b[...]/${pkg}.test
 	//     go run:  [...]/go-build[...]/b[...]/exe/bar
 	var dockerFlags []string
 	var binary string
 	var testFlags []string
-	rxBinary := regexp.MustCompile(`\.test$|/exe/[a-zA-Z0-9_]+$`)
+	rxBinary := regexp.MustCompile(`\.test(\.exe)?$|/exe/[a-zA-Z0-9_]+(\.exe)?$`)
 	for i, arg := range args {
 		if !strings.HasPrefix(arg, "-") && rxBinary.MatchString(arg) {
 			dockerFlags = args[:i]
