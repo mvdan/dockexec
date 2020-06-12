@@ -1,0 +1,27 @@
+# Test that the -prog flag works as expected
+
+[!exec:docker-compose] skip 'Requires docker-compose'
+[windows] skip 'TODO: support windows-native images in --volume flags'
+[!windows] env IMAGE=busybox:1.31.1-musl
+
+go test -v -exec 'dockexec -compose eg'
+stdout Hello
+! stderr .+
+
+-- go.mod --
+module mod.com/blah
+
+-- main_test.go --
+package main
+
+import "testing"
+
+func TestThis(t *testing.T) {
+	println("Hello")
+}
+-- docker-compose.yml --
+version: '3.2'
+
+services:
+  eg:
+    image: $IMAGE

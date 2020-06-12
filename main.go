@@ -16,7 +16,10 @@ import (
 	"syscall"
 )
 
-var flagSet = flag.NewFlagSet("dockexec", flag.ContinueOnError)
+var (
+	flagSet  = flag.NewFlagSet("dockexec", flag.ContinueOnError)
+	fCompose = flagSet.Bool("compose", false, "use docker-compose instead of docker to run the test binary")
+)
 
 func init() { flagSet.Usage = usage }
 
@@ -24,7 +27,11 @@ func usage() {
 	fmt.Fprintf(os.Stderr, `
 Usage of dockexec:
 
-	go test -exec='dockexec [docker flags] image:tag' [test flags]
+	go test -exec='dockexec [docker run flags] image:tag' [test flags]
+
+Or, to use docker-compose instead of docker to run the test binary:
+
+	go test -exec='dockexec -compose [docker run flags] service' [test flags]
 
 For example:
 
@@ -130,14 +137,26 @@ func mainerr() error {
 	// Then, add the user's docker flags.
 	allDockerArgs = append(allDockerArgs, dockerFlags...)
 
-	// Add "--" to stop all docker flags, plus the specified image.
-	allDockerArgs = append(allDockerArgs, "--", image)
+	// Add "--" to stop all docker flags if we are not in compose mode.
+	// docker-compose does not (yet) know how to handle --:
+	// https://github.com/docker/compose/issues/7540
+	if !*fCompose {
+		allDockerArgs = append(allDockerArgs, "--")
+	}
+
+	// Add the docker image/service name
+	allDockerArgs = append(allDockerArgs, image)
 
 	// Finally, pass all the test arguments to the test binary, such as
 	// -test.timeout or -test.v flags.
 	allDockerArgs = append(allDockerArgs, testFlags...)
 
-	cmd := exec.Command("docker", allDockerArgs...)
+	prog := "docker"
+	if *fCompose {
+		prog = "docker-compose"
+	}
+
+	cmd := exec.Command(prog, allDockerArgs...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -223,9 +242,11 @@ func buildDockerFlags() ([]string, error) {
 		dockerGp = append(dockerGp, dv)
 	}
 	res = append(res,
-		"--env=GOPATH="+strings.Join(dockerGp, string(os.PathListSeparator)),
+		// Use -e to specify environment variables, as this flag is common to both
+		// docker and docker-compose (--env is not an option with docker-compose).
+		"-e", "GOPATH="+strings.Join(dockerGp, string(os.PathListSeparator)),
 		fmt.Sprintf("--volume=%v:/gocache", env.GOCACHE),
-		"--env=GOCACHE=/gocache",
+		"-e", "GOCACHE=/gocache",
 	)
 
 	wd, err := os.Getwd()
