@@ -2,7 +2,7 @@
 
 Run Go tests inside a Docker image.
 
-	go get mvdan.cc/dockexec
+	go install mvdan.cc/dockexec@latest
 	go test -exec='dockexec postgres:12.1'
 
 You can also use custom flags for `docker run`, as well as any test flags:
