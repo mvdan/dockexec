@@ -113,6 +113,20 @@ func mainerr() error {
 		return usageErr("could not find the test binary argument")
 	}
 
+	tempHome, err := os.MkdirTemp("", "dockexec-home")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := os.RemoveAll(tempHome); err != nil {
+			fmt.Println(err) // warn the user
+		}
+	}()
+	realHome, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
 	// First, start with our docker flags.
 	allDockerArgs := []string{
 		"run",
@@ -124,8 +138,18 @@ func mainerr() error {
 		fmt.Sprintf("--volume=%s:/init", binary),
 		"--entrypoint=/init",
 
-		// User uid and git for GOPATH and GOCACHE volume mappings
+		// User uid and git for GOPATH and GOCACHE volume mappings.
 		fmt.Sprintf("--user=%v:%v", syscall.Getuid(), syscall.Getgid()),
+
+		// Mount host files so the container can know what UID and GID stand for.
+		// Note that we don't mount /etc/shadow, as we shouldn't need passwords.
+		"--volume=/etc/passwd:/etc/passwd:ro",
+		"--volume=/etc/group:/etc/group:ro",
+
+		// Also mount a temporary empty directory as the user's home.
+		// We don't want to mount the host's real home, to prevent harm.
+		// We still need $HOME to exist as a directory, for completeness.
+		fmt.Sprintf("--volume=%s:%s", tempHome, realHome),
 	}
 
 	// Add docker flags based on our context (module-aware, GOPATH or ad hoc mode)
