@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -138,7 +139,7 @@ func mainerr() error {
 		fmt.Sprintf("--volume=%s:/init", binary),
 		"--entrypoint=/init",
 
-		// User uid and git for GOPATH and GOCACHE volume mappings.
+		// User uid and gid so mounting HOME, GOCACHE, etc just works.
 		fmt.Sprintf("--user=%v:%v", syscall.Getuid(), syscall.Getgid()),
 
 		// Mount host files so the container can know what UID and GID stand for.
@@ -258,6 +259,9 @@ func buildDockerFlags() ([]string, error) {
 	var dockerGp []string // the gopath elements for the container
 	for i, v := range strings.Split(env.GOPATH, string(os.PathListSeparator)) {
 		ev, err := filepath.EvalSymlinks(v)
+		if errors.Is(err, os.ErrNotExist) {
+			continue // no directory to mount
+		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to filepath.EvalSymlinks(%q): %v", v, err)
 		}
