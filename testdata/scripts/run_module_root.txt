@@ -1,6 +1,6 @@
 # Test that dockexec works from a module root that is a domain only
 
-[!windows] env IMAGE=busybox:1.31.1-musl
+[!windows] env IMAGE=busybox:1.34.1-musl
 [windows] skip 'TODO: support windows-native images in --volume flags'
 
 exec go run -exec='dockexec '$IMAGE .
