@@ -8,9 +8,6 @@
 [windows] skip 'TODO: support windows-native images in --volume flags'
 [windows] env IMAGE=mcr.microsoft.com/windows/nanoserver:1809
 
-# Set a custom GOPATH
-env GOPATH=$WORK/gp1:$WORK/gp2
-
 exec go test -exec='dockexec '$IMAGE' -v '$HOST_GOROOT':/goroot ' -v ./cmd/blah
 ! stderr .+
 
@@ -21,17 +18,13 @@ exec go test -exec='dockexec '$IMAGE' -v '$HOST_GOROOT':/goroot ' -v ./cmd/blah
 [!windows] stdout '^\Qmain module root: /start/go.mod\E$'
 [windows]  stdout '^\Q\E$'
 
-# gopath
-[!windows] stdout '^\Qgopath: /gopath1:/gopath2\E$'
+# gomodcache
+[!windows] stdout '^\Qgomodcache: /gomodcache\E$'
 [windows]  stdout '^\Q\E$'
 
 # gocache
 [!windows] stdout '^\Qgocache: /gocache\E$'
 [windows]  stdout '^\Q\E$'
-
--- gp1/file.txt --
-
--- gp2/file.txt --
 
 -- go.mod --
 module mod.com
@@ -47,7 +40,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -62,9 +54,9 @@ func TestOutput(t *testing.T) {
 
 	// Verify that we can run go
 	var env struct {
-		GOCACHE string
-		GOPATH  string
-		GOMOD   string
+		GOMODCACHE string
+		GOCACHE    string
+		GOMOD      string
 	}
 	cmd := exec.Command("/goroot/bin/go", "env", "-json")
 	out, err := cmd.CombinedOutput()
@@ -75,14 +67,6 @@ func TestOutput(t *testing.T) {
 		t.Fatalf("failed to unmarshal %v output: %v", strings.Join(cmd.Args, " "), err)
 	}
 	fmt.Printf("main module root: %v\n", env.GOMOD)
-	fmt.Printf("gopath: %v\n", env.GOPATH)
+	fmt.Printf("gomodcache: %v\n", env.GOMODCACHE)
 	fmt.Printf("gocache: %v\n", env.GOCACHE)
-
-	// Verify that dummy files exist for each element of GOPATH
-	for _, v := range strings.Split(env.GOPATH, string(os.PathListSeparator)) {
-		f := filepath.Join(v, "file.txt")
-		if _, err := os.Stat(f); err != nil {
-			t.Fatalf("failed to stat %v: %v", f, err)
-		}
-	}
 }

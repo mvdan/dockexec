@@ -5,7 +5,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -153,7 +152,7 @@ func mainerr() error {
 		fmt.Sprintf("--volume=%s:%s", tempHome, realHome),
 	}
 
-	// Add docker flags based on our context (module-aware, GOPATH or ad hoc mode)
+	// Add docker flags based on our context (module-aware or ad hoc mode)
 	contextDockerFlags, err := buildDockerFlags()
 	if err != nil {
 		return err
@@ -196,12 +195,10 @@ func mainerr() error {
 // context. We apply different logic based on whether we are in:
 //
 // * module-aware mode
-// * GOPATH mode
 // * ad hoc mode
 //
-// For all the scenarios below the test binary will be mounted as /init; GOPATH
-// and GOCACHE are made available at canonical locations. The GOPATH mode
-// description below describes how and where GOPATH is made available.
+// For all the scenarios below the test binary will be mounted as /init;
+// GOMODCACHE and GOCACHE are made available at canonical locations.
 //
 // Module-aware mode
 // -----------------
@@ -215,19 +212,6 @@ func mainerr() error {
 // Then $moddir will be mounted as /start and the working directory will be
 // /start/cmd/blah.
 //
-// GOPATH mode (to be implemented)
-// -------------------------------
-// Assuming:
-//
-// * GOPATH=/gp1:/gp2
-// * that the package github.com/a/b/cmd/blah exists within /gp1/src
-// * a working directory of /gp1/src/github.com/a/b
-// * that we run go test -exec='...' ./cmd/blah
-//
-// Then /gp2 will be mounted as /gopath2, /gp1 will be mounted as /gopath1,
-// GOPATH=/gopath1:/gopath2 will be set, and the working directory will be
-// /gopath2/src/github.com/a/b
-//
 // Ad hoc mode
 // -----------
 // Assuming:
@@ -240,9 +224,9 @@ func buildDockerFlags() ([]string, error) {
 	var res []string
 
 	var env struct {
-		GOCACHE string
-		GOPATH  string
-		GOMOD   string
+		GOMODCACHE string
+		GOCACHE    string
+		GOMOD      string
 	}
 	envCmd := exec.Command("go", "env", "-json")
 	out, err := envCmd.CombinedOutput()
@@ -253,27 +237,11 @@ func buildDockerFlags() ([]string, error) {
 		return nil, fmt.Errorf("failed to unmarshal %v output: %v", strings.Join(envCmd.Args, " "), err)
 	}
 
-	// Normalise GOPATH elements for symlinks for the purposes of
-	// GOPATH mode below
-	var gp []string
-	var dockerGp []string // the gopath elements for the container
-	for i, v := range strings.Split(env.GOPATH, string(os.PathListSeparator)) {
-		ev, err := filepath.EvalSymlinks(v)
-		if errors.Is(err, os.ErrNotExist) {
-			continue // no directory to mount
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to filepath.EvalSymlinks(%q): %v", v, err)
-		}
-		gp = append(gp, ev)
-		dv := fmt.Sprintf("/gopath%v", i+1)
-		res = append(res, fmt.Sprintf("--volume=%v:%v", ev, dv))
-		dockerGp = append(dockerGp, dv)
-	}
 	res = append(res,
 		// Use -e to specify environment variables, as this flag is common to both
 		// docker and docker-compose (--env is not an option with docker-compose).
-		"-e", "GOPATH="+strings.Join(dockerGp, string(os.PathListSeparator)),
+		fmt.Sprintf("--volume=%v:/gomodcache", env.GOMODCACHE),
+		"-e", "GOMODCACHE=/gomodcache",
 		fmt.Sprintf("--volume=%v:/gocache", env.GOCACHE),
 		"-e", "GOCACHE=/gocache",
 	)
@@ -308,26 +276,7 @@ func buildDockerFlags() ([]string, error) {
 		return res, nil
 	}
 
-	// At this point we know we are not in module-aware module/main module.
-	// Check whether our working directory is a subdirectory of a GOPATH
-	// element, in which case we are in GOPATH mode.
-	found := -1
-	var rel string
-	for i, p := range gp {
-		if strings.HasPrefix(wd, p+string(os.PathSeparator)) { // TODO fix up when we properly support windows
-			found = i
-			rel = strings.TrimPrefix(wd, p+string(os.PathSeparator))
-			break
-		}
-	}
-	if found > -1 {
-		// we are in GOPATH mode
-		res = append(res,
-			fmt.Sprintf("--workdir=%v", path.Join(dockerGp[found], rel)), // TODO fix up when we properly support windows
-		)
-		return res, nil
-	}
-
+	// Ad-hoc mode.
 	res = append(res,
 		fmt.Sprintf("--volume=%v:/start", wd),
 		"--workdir=/start",
