@@ -259,7 +259,7 @@ func buildDockerFlags() ([]string, error) {
 	for i, v := range strings.Split(env.GOPATH, string(os.PathListSeparator)) {
 		ev, err := filepath.EvalSymlinks(v)
 		if err != nil {
-			return nil, fmt.Errorf("failed to filepath.EvalSymlinks(%q)", v)
+			return nil, fmt.Errorf("failed to filepath.EvalSymlinks(%q): %v", v, err)
 		}
 		gp = append(gp, ev)
 		dv := fmt.Sprintf("/gopath%v", i+1)

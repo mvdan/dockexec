@@ -1,7 +1,10 @@
 # Verify setting of working directory, volumes and environment variables for module-aware projects
 
-# Establish the image we are using
-[!windows] env IMAGE=busybox:1.31.1-glibc
+# Establish the image we are using.
+# Note that we need the same libc that the host is using.
+# On Linux, we assume glibc. We use a pinned Debian Testing,
+# because stable Debian often has a glibc that's too old.
+[!windows] env IMAGE=debian:bookworm-20211220-slim
 [windows] skip 'TODO: support windows-native images in --volume flags'
 [windows] env IMAGE=mcr.microsoft.com/windows/nanoserver:1809
 
