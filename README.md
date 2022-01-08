@@ -32,3 +32,8 @@ any good:
 * Docker images are assumed to be unix-like at the moment, and only Linux images
   are tested. Other platforms like Windows-native images may be supported in the
   future.
+
+* Beware that the Docker image may not have compatible C libraries, given the
+  default of `CGO_ENABLED=1`. If you run into "no such file" exec errors,
+  or glibc version mismatch errors, you should consider disabling cgo via
+  `CGO_ENABLED=0` or a [fully static build](https://github.com/golang/go/issues/26492).

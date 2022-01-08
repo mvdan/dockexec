@@ -8,9 +8,6 @@
 [windows] skip 'TODO: support windows-native images in --volume flags'
 [windows] env IMAGE=mcr.microsoft.com/windows/nanoserver:1809
 
-# Set a custom GOPATH
-env GOPATH=$WORK/gp1:$WORK/gp2
-
 exec go test -exec='dockexec '$IMAGE' -v '$HOST_GOROOT':/goroot ' -v main_test.go
 ! stderr .+
 
@@ -25,9 +22,6 @@ exec go test -exec='dockexec '$IMAGE' -v '$HOST_GOROOT':/goroot ' -v main_test.g
 # gocache
 [!windows] stdout '^\Qgocache: /gocache\E$'
 [windows]  stdout '^\Q\E$'
-
--- main.go --
-package main
 
 -- main_test.go --
 package main
