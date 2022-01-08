@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"syscall"
 )
@@ -152,6 +153,15 @@ func mainerr() error {
 		fmt.Sprintf("--volume=%s:%s", tempHome, realHome),
 	}
 
+	// Ensure both systems agree on where $HOME is.
+	// We don't want discrepancies because of /etc/passwd or cgo.
+	// Note that this is HOME on most systems except Windows.
+	if runtime.GOOS != "windows" {
+		allDockerArgs = append(allDockerArgs, "-e", "HOME="+realHome)
+	} else {
+		allDockerArgs = append(allDockerArgs, "-e", "USERPROFILE="+realHome)
+	}
+
 	// Add docker flags based on our context (module-aware or ad hoc mode)
 	contextDockerFlags, err := buildDockerFlags()
 	if err != nil {
@@ -240,6 +250,7 @@ func buildDockerFlags() ([]string, error) {
 	res = append(res,
 		// Use -e to specify environment variables, as this flag is common to both
 		// docker and docker-compose (--env is not an option with docker-compose).
+		// TODO: when docker-compose v2 is widespread, switch to --env=NAME=VAL.
 		fmt.Sprintf("--volume=%v:/gomodcache", env.GOMODCACHE),
 		"-e", "GOMODCACHE=/gomodcache",
 		fmt.Sprintf("--volume=%v:/gocache", env.GOCACHE),

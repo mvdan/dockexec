@@ -1,4 +1,14 @@
-# Basic test cases for dockexec
+# Basic test cases for dockexec.
+
+# Note that we want to test os.UserHomeDir,
+# so ensure that "go test" has a valid HOME too.
+mkdir empty-home
+[!windows] env HOME=${WORK}${/}empty-home
+[windows] env USERPROFILE=${WORK}${/}empty-home
+
+# Note that the os/user import requires extra C libraries,
+# which we don't need; we want os/user's "pure Go" behavior.
+env CGO_ENABLED=0
 
 # Check that we succeed without -exec.
 exec go test
@@ -53,6 +63,7 @@ import (
 	"flag"
 	"os"
 	"os/exec"
+	"os/user"
 	"runtime"
 	"testing"
 )
@@ -86,5 +97,22 @@ func TestWithMyFlag(t *testing.T) {
 func TestWithMyVar(t *testing.T) {
 	if os.Getenv("MYVAR") != "foo" {
 		t.Skip("MYVAR=foo not specified")
+	}
+}
+
+func TestUserHomeDIr(t *testing.T) {
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("os.UserHomeDir failed: %v", err)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatalf("os.UserHomeDir cannot be accessed: %v", err)
+	}
+}
+
+func TestCurrentUser(t *testing.T) {
+	_, err := user.Current()
+	if err != nil {
+		t.Fatalf("user.Current failed: %v", err)
 	}
 }
