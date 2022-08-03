@@ -1,30 +1,33 @@
 # Verify setting of working directory, volumes and environment variables for module-aware projects
 
 # Establish the image we are using.
-# Note that we need the same libc that the host is using.
-# On Linux, we assume glibc. We use a pinned Debian Testing,
-# because stable Debian often has a glibc that's too old.
-[!windows] env IMAGE=debian:bookworm-20211220-slim
+# Note that we need the same libc variant that the host is using,
+# and a version that's not too old either.
+# On Linux, we assume glibc for now, for simplicity.
+# We use a pinned Arch image, as Debian's glibc tends to be old.
+[!windows] env IMAGE=archlinux:base-20220731.0.71623
 [windows] skip 'TODO: support windows-native images in --volume flags'
 [windows] env IMAGE=mcr.microsoft.com/windows/nanoserver:1809
 
 exec go test -exec='dockexec '$IMAGE' -v '$HOST_GOROOT':/goroot ' -v ./cmd/blah
 ! stderr .+
+stdout '^\Qworking directory: /start/cmd/blah\E$'
+stdout '^\Qmain module root: /start/go.mod\E$'
+stdout '^\Qgomodcache: /gomodcache\E$'
+stdout '^\Qgocache: /gocache\E$'
 
-# working directory
-[!windows] stdout '^\Qworking directory: /start/cmd/blah\E$'
-[windows]  stdout '^\Q\E$'
+# Now in ad-hoc mode, specifying Go files directly.
+exec go test -exec='dockexec '$IMAGE' -v '$HOST_GOROOT':/goroot ' -v cmd/blah/main_test.go
+! stderr .+
+stdout '^\Qworking directory: /start/cmd/blah\E$'
+stdout '^\Qmain module root: /start/go.mod\E$'
 
-[!windows] stdout '^\Qmain module root: /start/go.mod\E$'
-[windows]  stdout '^\Q\E$'
-
-# gomodcache
-[!windows] stdout '^\Qgomodcache: /gomodcache\E$'
-[windows]  stdout '^\Q\E$'
-
-# gocache
-[!windows] stdout '^\Qgocache: /gocache\E$'
-[windows]  stdout '^\Q\E$'
+# Ad-hoc mode without a module.
+rm go.mod
+exec go test -exec='dockexec '$IMAGE' -v '$HOST_GOROOT':/goroot ' -v cmd/blah/main_test.go
+! stderr .+
+stdout '^\Qworking directory: /start\E$'
+stdout '^\Qmain module root: /dev/null\E$'
 
 -- go.mod --
 module mod.com
