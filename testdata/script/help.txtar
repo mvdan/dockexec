@@ -1,12 +1,12 @@
-! dockexec
+! exec dockexec
 stderr -count=1 'Usage of'
 stderr '\tgo test'
 ! stdout .
 
-! dockexec -h
+! exec dockexec -h
 stderr 'Usage of'
 ! stdout .
 
-! dockexec -badflag
+! exec dockexec -badflag
 stderr 'Usage of'
 ! stdout .

@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 
 var update = flag.Bool("u", false, "update testscript output files")
 
-func TestScripts(t *testing.T) {
+func TestScript(t *testing.T) {
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Skip("docker is required to run dockexec tests")
 	}
@@ -32,7 +32,7 @@ func TestScripts(t *testing.T) {
 	t.Parallel()
 
 	p := testscript.Params{
-		Dir: filepath.Join("testdata", "scripts"),
+		Dir: filepath.Join("testdata", "script"),
 		Setup: func(env *testscript.Env) error {
 			bindir := filepath.Join(env.WorkDir, ".bin")
 			if err := os.Mkdir(bindir, 0o777); err != nil {
@@ -53,7 +53,8 @@ func TestScripts(t *testing.T) {
 			env.Vars = append(env.Vars, "HOST_GOROOT="+runtime.GOROOT())
 			return nil
 		},
-		UpdateScripts: *update,
+		UpdateScripts:       *update,
+		RequireExplicitExec: true,
 	}
 	if err := gotooltest.Setup(&p); err != nil {
 		t.Fatal(err)
