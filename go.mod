@@ -1,6 +1,6 @@
 module mvdan.cc/dockexec
 
-go 1.19
+go 1.20
 
 require github.com/rogpeppe/go-internal v1.9.0
 
