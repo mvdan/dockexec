@@ -19,7 +19,7 @@ import (
 
 var (
 	flagSet  = flag.NewFlagSet("dockexec", flag.ContinueOnError)
-	fCompose = flagSet.Bool("compose", false, "use docker-compose instead of docker to run the test binary")
+	fCompose = flagSet.Bool("compose", false, "use 'docker compose' instead of docker to run the test binary")
 )
 
 func init() { flagSet.Usage = usage }
@@ -30,7 +30,7 @@ Usage of dockexec:
 
 	go test -exec='dockexec [docker run flags] image:tag' [test flags]
 
-Or, to use docker-compose instead of docker to run the test binary:
+Or, to use 'docker compose' instead of docker to run the test binary:
 
 	go test -exec='dockexec -compose [docker run flags] service' [test flags]
 
@@ -131,7 +131,11 @@ func mainerr() error {
 	}
 
 	// First, start with our docker flags.
-	allDockerArgs := []string{
+	var allDockerArgs []string
+	if *fCompose {
+		allDockerArgs = append(allDockerArgs, "compose")
+	}
+	allDockerArgs = append(allDockerArgs,
 		"run",
 
 		// Delete the container when we're done.
@@ -153,7 +157,7 @@ func mainerr() error {
 		// We don't want to mount the host's real home, to prevent harm.
 		// We still need $HOME to exist as a directory, for completeness.
 		fmt.Sprintf("--volume=%s:%s", tempHome, realHome),
-	}
+	)
 
 	// Ensure both systems agree on where $HOME is.
 	// We don't want discrepancies because of /etc/passwd or cgo.
@@ -175,11 +179,7 @@ func mainerr() error {
 	allDockerArgs = append(allDockerArgs, dockerFlags...)
 
 	// Add "--" to stop all docker flags if we are not in compose mode.
-	// docker-compose does not (yet) know how to handle --:
-	// https://github.com/docker/compose/issues/7540
-	if !*fCompose {
-		allDockerArgs = append(allDockerArgs, "--")
-	}
+	allDockerArgs = append(allDockerArgs, "--")
 
 	// Add the docker image/service name
 	allDockerArgs = append(allDockerArgs, image)
@@ -188,12 +188,7 @@ func mainerr() error {
 	// -test.timeout or -test.v flags.
 	allDockerArgs = append(allDockerArgs, testFlags...)
 
-	prog := "docker"
-	if *fCompose {
-		prog = "docker-compose"
-	}
-
-	cmd := exec.Command(prog, allDockerArgs...)
+	cmd := exec.Command("docker", allDockerArgs...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -250,13 +245,10 @@ func buildDockerFlags() ([]string, error) {
 	}
 
 	res = append(res,
-		// Use -e to specify environment variables, as this flag is common to both
-		// docker and docker-compose (--env is not an option with docker-compose).
-		// TODO: when docker-compose v2 is widespread, switch to --env=NAME=VAL.
 		fmt.Sprintf("--volume=%v:/gomodcache", env.GOMODCACHE),
-		"-e", "GOMODCACHE=/gomodcache",
+		"--env=GOMODCACHE=/gomodcache",
 		fmt.Sprintf("--volume=%v:/gocache", env.GOCACHE),
-		"-e", "GOCACHE=/gocache",
+		"--env=GOCACHE=/gocache",
 	)
 
 	wd, err := os.Getwd()

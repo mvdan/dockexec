@@ -1,6 +1,5 @@
 # Test that the -prog flag works as expected
 
-[!exec:docker-compose] skip 'Requires docker-compose'
 [windows] skip 'TODO: support windows-native images in --volume flags'
 [!windows] env IMAGE=busybox:1.34.1-musl
 
