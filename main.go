@@ -25,7 +25,7 @@ var (
 func init() { flagSet.Usage = usage }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, `
+	fmt.Fprint(os.Stderr, `
 Usage of dockexec:
 
 	go test -exec='dockexec [docker run flags] image:tag' [test flags]
@@ -42,6 +42,8 @@ For example:
 You can also run it directly, if you must:
 
 	dockexec image:tag [docker flags] pkg.test [test flags]
+
+Flags:
 `[1:])
 	flagSet.PrintDefaults()
 }
