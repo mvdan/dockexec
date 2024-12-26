@@ -56,23 +56,21 @@ type flagErr string
 
 func (f flagErr) Error() string { return string(f) }
 
-func main() { os.Exit(main1()) }
-
-func main1() int {
+func main() {
 	err := mainerr()
 	if err == nil {
-		return 0
+		return
 	}
 	switch err.(type) {
 	case usageErr:
 		fmt.Fprintln(os.Stderr, err)
 		flagSet.Usage()
-		return 2
+		os.Exit(2)
 	case flagErr:
-		return 2
+		os.Exit(2)
 	}
 	fmt.Fprintln(os.Stderr, err)
-	return 1
+	os.Exit(1)
 }
 
 func mainerr() error {
