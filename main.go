@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	flagSet  = flag.NewFlagSet("dockexec", flag.ContinueOnError)
+	flagSet  = flag.NewFlagSet("dockexec", flag.ExitOnError)
 	fCompose = flagSet.Bool("compose", false, "use 'docker compose' instead of docker to run the test binary")
 )
 
@@ -48,39 +48,14 @@ Flags:
 	flagSet.PrintDefaults()
 }
 
-type usageErr string
-
-func (u usageErr) Error() string { return string(u) }
-
-type flagErr string
-
-func (f flagErr) Error() string { return string(f) }
-
 func main() {
-	err := mainerr()
-	if err == nil {
-		return
-	}
-	switch err.(type) {
-	case usageErr:
-		fmt.Fprintln(os.Stderr, err)
-		flagSet.Usage()
-		os.Exit(2)
-	case flagErr:
-		os.Exit(2)
-	}
-	fmt.Fprintln(os.Stderr, err)
-	os.Exit(1)
-}
-
-func mainerr() error {
-	if err := flagSet.Parse(os.Args[1:]); err != nil {
-		return flagErr(err.Error())
-	}
+	flagSet.Parse(os.Args[1:])
 	args := flagSet.Args()
 
 	if len(args) < 2 {
-		return usageErr("incorrect number of arguments")
+		fmt.Fprintln(os.Stderr, "incorrect number of arguments")
+		flagSet.Usage()
+		os.Exit(2)
 	}
 	image := args[0]
 	args = args[1:]
@@ -111,12 +86,15 @@ func mainerr() error {
 		}
 	}
 	if binary == "" {
-		return usageErr("could not find the test binary argument")
+		fmt.Fprintln(os.Stderr, "could not find the test binary argument")
+		flagSet.Usage()
+		os.Exit(2)
 	}
 
 	tempHome, err := os.MkdirTemp("", "dockexec-home")
 	if err != nil {
-		return err
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	defer func() {
 		if err := os.RemoveAll(tempHome); err != nil {
@@ -125,7 +103,8 @@ func mainerr() error {
 	}()
 	realHome, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 
 	// First, start with our docker flags.
@@ -169,7 +148,8 @@ func mainerr() error {
 	// Add docker flags based on our context (module-aware or ad hoc mode)
 	contextDockerFlags, err := buildDockerFlags()
 	if err != nil {
-		return err
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	allDockerArgs = append(allDockerArgs, contextDockerFlags...)
 
@@ -191,9 +171,9 @@ func mainerr() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return err
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	return nil
 }
 
 // buildDockerFlags returns a slice of docker flags based on the current

@@ -3,7 +3,7 @@ stderr -count=1 'Usage of'
 stderr '\tgo test'
 ! stdout .
 
-! exec dockexec -h
+exec dockexec -h
 stderr 'Usage of'
 ! stdout .
 
