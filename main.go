@@ -69,14 +69,20 @@ func main() {
 	// packages at the module root might contain dots, e.g. foo.com). If this
 	// isn't enough in the long run, we can start parsing docker flags instead.
 	//
-	// As of today, the binary can look like (possibly with an ".exe" suffix):
+	// As of Go 1.23, the binary can look like (possibly with an ".exe" suffix),
+	// as the binaries are placed in a temporary directory:
 	//
 	//     go test: [...]/go-build[...]/b[...]/${pkg}.test
 	//     go run:  [...]/go-build[...]/b[...]/exe/bar
+	//
+	// As of Go 1.24, the 'go run' binaries are placed inside ${GOCACHE},
+	// o they instead may look like:
+	//
+	//     ${GOCACHE}/12/1234deadbeef[...]-d/bar
 	var dockerFlags []string
 	var binary string
 	var testFlags []string
-	rxBinary := regexp.MustCompile(`\.test(\.exe)?$|/exe/[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?(\.exe)?$`)
+	rxBinary := regexp.MustCompile(`\.test(\.exe)?$|/exe/[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)?(\.exe)?$|/[a-f0-9]+-d/[^/]+$`)
 	for i, arg := range args {
 		if !strings.HasPrefix(arg, "-") && rxBinary.MatchString(arg) {
 			dockerFlags = args[:i]
@@ -86,7 +92,8 @@ func main() {
 		}
 	}
 	if binary == "" {
-		fmt.Fprintln(os.Stderr, "could not find the test binary argument")
+		fmt.Fprintf(os.Stderr, "could not find the test binary argument amongst:\n")
+		fmt.Fprintf(os.Stderr, "  %q\n\n", args)
 		flagSet.Usage()
 		os.Exit(2)
 	}
