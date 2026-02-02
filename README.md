@@ -22,6 +22,27 @@ any good:
 * Running `go test -c` and running the test binary under `docker run` is
   tedious, error-prone, and doesn't scale to many packages.
 
+### Usage with `go tool`
+
+dockexec can be used with the custom tool feature in go.mod:
+
+```
+go get -tool mvdan.cc/dockexec@latest
+go test -exec='go tool dockexec postgres:12.1'
+```
+
+If the container's OS and architecture are not identical to the host,
+this workaround is necessary to compile each part correctly:
+
+```
+GOOS=linux GOARCH=amd64 go test -exec 'env GOOS= GOARCH= go tool dockexec postgres:12.1'
+```
+
+The “outer” GOOS/GOARCH are for the test binary and have to match the container image.
+The “inner” GOOS/GOARCH are for the host OS where dockexec runs.
+They are set to empty to let them default to native.
+
+
 ### Caveats
 
 * `go test` without package arguments runs tests with access to the current
