@@ -37,3 +37,19 @@ any good:
   default of `CGO_ENABLED=1`. If you run into "no such file" exec errors,
   or glibc version mismatch errors, you should consider disabling cgo via
   `CGO_ENABLED=0` or a [fully static build](https://github.com/golang/go/issues/26492).
+
+#### unable to start container process: error during container init: exec: "/init": is a directory: permission denied
+
+This error happens when the test binary as created by `go test` is not available to the Docker daemon,
+which then creates and mounts an empty directory.
+It occurs when the Docker daemon is not running in the same environment as dockexec,
+for example when [running Docker-in-Docker in Gitlab CI, where /tmp is not shared with it](https://docs.gitlab.com/ci/docker/using_docker_build/#known-issues-with-docker-in-docker).
+
+As a workaround, you can set the environment variable `GOTMPDIR` to a directory that is shared.
+In Gitlab CI, that is everything below the build directory:
+
+```
+mkdir -p tmp
+GOTMPDIR=$PWD/tmp go test -exec 'dockexec …'
+```
+
