@@ -121,6 +121,15 @@ func main() {
 	}
 	allDockerArgs = append(allDockerArgs,
 		"run",
+	)
+	if !*fCompose && runtime.GOOS != "windows" {
+		// On SELinux systems, mounted files are unreadable without
+		// relabeling, which we don't want for host files like /etc/passwd.
+		// 'compose run' does not support the flag; compose files can set
+		// security_opt instead.
+		allDockerArgs = append(allDockerArgs, "--security-opt=label=disable")
+	}
+	allDockerArgs = append(allDockerArgs,
 
 		// Delete the container when we're done.
 		"--rm",
@@ -227,6 +236,14 @@ func buildDockerFlags() ([]string, error) {
 	}
 	if err := json.Unmarshal(out, &env); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal %v output: %v", strings.Join(envCmd.Args, " "), err)
+	}
+
+	// The caches may not exist yet, and podman refuses to mount
+	// nonexistent host paths, unlike docker.
+	for _, dir := range []string{env.GOMODCACHE, env.GOCACHE} {
+		if err := os.MkdirAll(dir, 0o777); err != nil {
+			return nil, err
+		}
 	}
 
 	res = append(res,

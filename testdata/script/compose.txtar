@@ -24,3 +24,7 @@ version: '3.2'
 services:
   eg:
     image: $IMAGE
+    # Mounted files such as the test binary are unreadable on SELinux
+    # systems otherwise; 'compose run' does not support --security-opt.
+    security_opt:
+      - label=disable
