@@ -1,11 +1,5 @@
 # Basic test cases for dockexec.
 
-# Note that we want to test os.UserHomeDir,
-# so ensure that "go test" has a valid HOME too.
-mkdir empty-home
-[!windows] env HOME=${WORK}${/}empty-home
-[windows] env USERPROFILE=${WORK}${/}empty-home
-
 # Note that the os/user import requires extra C libraries,
 # which we don't need; we want os/user's "pure Go" behavior.
 env CGO_ENABLED=0
@@ -16,12 +10,12 @@ stdout 'PASS'
 
 # Check that we fail with an invalid image.
 ! exec go test -exec='dockexec :bad:syntax:'
-stdout 'docker:.*invalid'
+stdout 'invalid reference format'
 
 # Check that a bad 'docker run' flag breaks.
 ! exec go test -exec='dockexec irrelevant-image --invalidflag' -v
 stdout 'unknown flag'
-stdout 'docker run --help'
+stdout 'run --help'
 
 [!windows] env IMAGE=busybox:1.34.1-musl
 [windows] skip 'TODO: support windows-native images in --volume flags'

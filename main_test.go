@@ -48,6 +48,19 @@ func TestScript(t *testing.T) {
 			env.Vars = append(env.Vars, fmt.Sprintf("PATH=%s%c%s", bindir, filepath.ListSeparator, os.Getenv("PATH")))
 			env.Vars = append(env.Vars, "TESTSCRIPT_COMMAND=dockexec")
 
+			// dockexec uses os.UserHomeDir, and rootless podman requires
+			// $HOME to exist, but testscript defaults to HOME=/no-home.
+			// Give each script a valid empty home directory instead.
+			home := filepath.Join(env.WorkDir, ".home")
+			if err := os.Mkdir(home, 0o777); err != nil {
+				return err
+			}
+			if runtime.GOOS == "windows" {
+				env.Vars = append(env.Vars, "USERPROFILE="+home)
+			} else {
+				env.Vars = append(env.Vars, "HOME="+home)
+			}
+
 			// In order to make go available inside containers where the guest
 			// and host OS and arch match, we define HOST_GOROOT
 			env.Vars = append(env.Vars, "HOST_GOROOT="+runtime.GOROOT())
